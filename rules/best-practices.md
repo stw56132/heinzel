@@ -136,6 +136,8 @@ Long-running services should be managed by systemd
 (or rc on FreeBSD). systemd handles restarts,
 logging, dependencies, and boot ordering.
 → Create a systemd unit file.
+A one-off job that merely takes long is different:
+`rules/ssh-connections.md` → 4.
 
 **Cron restart as a band-aid**
 A cron job that restarts a service periodically

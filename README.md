@@ -104,6 +104,11 @@ More that happens without asking:
   `memory/servers/` with its state, a changelog and an open
   to-do list. An interrupted job shows up as pending on the
   next connection.
+- **Long jobs.** A command that can take more than a
+  minute runs as a job on the host, output and exit
+  status in files, and is read back later, after a
+  dropped connection or in a new session too
+  (`rules/ssh-connections.md`).
 - **DNS aliases.** Several names for the same IP share one
   memory. Each alias can have its own SSH user.
 - **SSH ports.** A port other than 22 is stored per server.

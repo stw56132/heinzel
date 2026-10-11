@@ -144,7 +144,23 @@ or `bash -c` level strips one layer of quotes, and
 Let the raw output speak, and run the check with
 the least privilege (`rules/privilege-escalation.md`).
 
-## When the finding survives all six
+### 7. A command without a result ran, or it did not
+
+A call that was cut off (the tool's time limit, a
+dropped connection, a context reset) leaves a
+command whose outcome you do not know. It ran to
+the end, it is still running, or it died halfway.
+Find out which before you repeat anything: the
+job's `status` file and process group
+(`rules/ssh-connections.md` → 4), `ps`, the service
+state, the package state (`dpkg --configure -a` and
+`apt-get -f install` report an interrupted apt run
+before you start a new one). "I will just run it
+again" is a guess, and for `useradd`, `cp` or a
+migration it is a second change on top of the
+first.
+
+## When the finding survives all seven
 
 Then it is real. Report it plainly, with the
 evidence that makes it real, and act or escalate.

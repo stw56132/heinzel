@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.30.0 — 2026-10-11
+
+- **Long jobs run on the host and are read back.**
+  A package upgrade or a big `rsync` used to run
+  inside the SSH call, which the tool's own time
+  limit or a dropped connection ends while the
+  command runs on, and its result was lost. A
+  command that can take more than a minute now runs
+  as a job under `~/.heinzel/jobs/<id>`, output and
+  exit status in files, started with `nohup` and
+  nothing else, and one later call reads it back.
+  Stopping, cleaning up and the check before an
+  interrupted command is repeated are spelled out
+  (`rules/ssh-connections.md` → 4,
+  `rules/verify-before-reporting.md` → 7) (#66).
+
 ## 2.29.2 — 2026-10-11
 
 - **The guard's file mode folds names the way macOS
