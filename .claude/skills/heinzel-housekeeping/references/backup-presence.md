@@ -93,9 +93,9 @@ ls /Applications 2>/dev/null \
 **Multiple destinations are common (e.g. a local disk
 plus a network share) — check each one by name, never
 rely on the bare, undirected form.** `tmutil
-latestbackup`, `tmutil listbackups`, and `tmutil
-status` without `-d <mount_point>` report only on the
-one destination Time Machine currently considers
+latestbackup` and `tmutil listbackups` without
+`-d <mount_point>` report only on the one destination
+Time Machine currently considers
 active (`LastDestination` in the `-X` output) — not on
 every configured destination. Querying only that one
 and generalizing the result ("no backup found") is how
@@ -112,13 +112,15 @@ tmutil latestbackup -d "<mount_point>" 2>&1
 tmutil listbackups -d "<mount_point>" 2>&1 | tail -1
 ```
 
-A network destination that is not currently mounted
-cannot be queried this way — note it as "not mounted,
+A destination that is not currently mounted cannot be
+queried this way: a network share, or a local disk
+that is unplugged, whose entry then carries no
+`MountPoint` key at all. Note it as "not mounted,
 last-backup unknown" rather than "no backup".
 
-`tmutil status` (no `-d`) only describes whatever
-destination is actively copying right now, if any. Use
-it to explain *that* backup's progress, never to
+`tmutil status` takes no `-d`. It only describes
+whatever destination is actively copying right now, if
+any. Use it to explain *that* backup's progress, never to
 conclude anything about a destination it is not
 currently touching.
 
@@ -159,6 +161,9 @@ Scope and limits). Run the closest equivalents —
   evidence (still OK, not WARN/CRITICAL), but name
   every destination and its own state on the line.
   Never collapse this into a single "no backup yet".
+  When no destination can be queried, the mechanism
+  exists and its last run is unknown: say that, never
+  CRITICAL.
 
 ## Recording the Answer
 
