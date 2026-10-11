@@ -24,8 +24,8 @@ One call per logical step, not one per command:
 
 - Send several files in one `scp`/`rsync`.
 - Do not poll a host every few seconds. Run a long
-  job on the host (`nohup`, `systemd-run`, `daemon`)
-  and read its log at an interval of minutes.
+  job on the host and read it back with one call
+  that waits there (section 4).
 - `ProxyJump` costs a connection to the jump host
   **and** one to the target.
 
@@ -141,3 +141,96 @@ them: `rules/ssh-user.md` (user names),
 `rules/privilege-escalation.md` (root probe),
 `rules/ssh-unreachable.md` (rejected logins, port
 probes) and `rules/ssh-port.md` (other ports).
+
+## 4. Long jobs
+
+The agent's own tool limit ends a call long before
+a host is done with a big job: Claude Code allows
+2 minutes per call by default and 10 at most. A
+dropped connection ends it just the same, and so
+does a context reset. The command keeps running on
+the host, and the session never learns its exit
+status or sees its output.
+
+So a command that can take more than a minute, or
+that must not be left half done (package upgrades,
+database migrations, `rsync` of a large tree,
+backups, builds, a long `find`), never runs inside
+the SSH call. It runs as a **job** on the host:
+one directory, the command in a file, its output
+and exit status in files beside it. The call only
+starts it and returns.
+
+    ssh … host 'sh -s' <<'EOS'
+    d=~/.heinzel/jobs/$(date +%Y%m%d-%H%M%S)-upgrade
+    mkdir -p "$d"
+    cat >"$d/cmd" <<'CMD'
+    apt-get -o DPkg::Lock::Timeout=300 -y dist-upgrade
+    CMD
+    (nohup sh -c 'sh "$1/cmd" >"$1/out" 2>"$1/err" &
+      echo $! >"$1/pid"; trap "" TERM
+      wait $!; echo $? >"$1/status"' sh "$d" \
+      </dev/null >/dev/null 2>&1 &)
+    ps -o pgid= -p $$ | tr -d " " >"$d/pgid"
+    echo "$d"
+    EOS
+
+This needs only `sh` and `nohup`, which Linux,
+FreeBSD and macOS all have: no root, no `screen` or
+`tmux`, nothing to install. The job outlives the
+call and the connection. Write it so that a second
+run does no harm, because one day you will not know
+whether the first one ran: `rsync` rather than `scp`
+or `cp`, `mkdir -p`, a check before `useradd`,
+`DPkg::Lock::Timeout` instead of failing on the
+lock, and never `&& reboot` on the same line as the
+upgrade. The reboot is its own step, after the
+result was read and the user asked for it.
+
+Read the job back with one call that waits on the
+host, never with a call every few seconds (section
+1). Set the tool's timeout to cover the wait (Claude
+Code: `timeout`, up to 10 minutes):
+
+    ssh … host 'sh -s' <<'EOS'
+    d=~/.heinzel/jobs/20261011-141500-upgrade
+    i=0
+    while [ ! -f "$d/status" ] && [ $i -lt 10 ]; do
+      sleep 30; i=$((i+1))
+    done
+    cat "$d/status" 2>/dev/null || echo running
+    tail -n 40 "$d/out" "$d/err"
+    EOS
+
+`status` holds the exit code and exists only once
+the job is over. No `status` after the wait means
+it is still running: repeat the call. No `status`
+and nothing left in the job's process group
+(`ps -o pid=,comm= -g "$(cat "$d/pgid")"`) means
+the host went down with the job: read what it left
+behind before anything is started again
+(`rules/verify-before-reporting.md` → 7).
+
+To stop a job, signal its process group. sshd gives
+every call a group of its own, and the wrapper
+ignores the signal, so the status is still
+recorded:
+
+    pkill -TERM -g "$(cat "$d/pgid")"
+
+In local mode the job shares the session's group;
+stop it by pid instead:
+
+    p=$(cat "$d/pid"); pkill -TERM -P "$p"; kill "$p"
+
+Delete the directory once the result is in the
+changelog. Before starting a job, remove what a
+dead session left behind:
+
+    find ~/.heinzel/jobs -mindepth 1 -maxdepth 1 \
+      -mtime +7 -exec rm -r {} +
+
+Record a running job and its directory in
+`memory/servers/<hostname>/todo.md`, so the next
+session, or a colleague's, picks it up instead of
+starting it again.
